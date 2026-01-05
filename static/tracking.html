@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cochería América | Acompañamiento del traslado</title>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    :root{
+      --bg: #f4f5f7;
+      --card: #ffffff;
+      --text: #111827;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+    }
+    body{
+      margin:0;
+      font-family: Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .wrap{
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 14px;
+    }
+    .header{
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 14px;
+      display:flex;
+      align-items:center;
+      gap: 12px;
+    }
+    .logo{
+      width: 54px;
+      height: 54px;
+      border-radius: 10px;
+      background: #fff;
+      border: 1px solid var(--border);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      overflow:hidden;
+      flex: 0 0 auto;
+    }
+    .logo img{
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      padding: 6px;
+    }
+    .title{
+      line-height: 1.2;
+    }
+    .title h1{
+      font-size: 18px;
+      margin: 0;
+      font-weight: 700;
+      letter-spacing: .2px;
+    }
+    .title p{
+      margin: 4px 0 0 0;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .card{
+      margin-top: 12px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow:hidden;
+    }
+    .info{
+      padding: 12px 14px;
+      display:flex;
+      flex-wrap: wrap;
+      gap: 10px 18px;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+    }
+    .chip{
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .status{
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #f3f4f6;
+      border: 1px solid var(--border);
+      color: #374151;
+    }
+    #map{
+      height: 72vh;
+      width: 100%;
+    }
+
+    /* Que se vea más sobrio */
+    .leaflet-control-attribution{
+      font-size: 10px !important;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="header">
+      <div class="logo">
+        <!-- Pone logo.png en esta misma carpeta -->
+        <img src="/static/logo.png" alt="Cocheria America" onerror="this.style.display='none';">
+
+      </div>
+      <div class="title">
+        <h1>Cochería America · Acompañamiento del servicio</h1>
+        <p>Este enlace permite acompañar el recorrido del servicio en tiempo real.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="info">
+        <div class="chip"><b>Servicio:</b> <span id="servicio">Servicio en curso</span></div>
+        <div class="chip"><b>Última actualización:</b> <span id="ultima">—</span></div>
+        <div class="status" id="estado">Actualizando…</div>
+      </div>
+      <div id="map"></div>
+    </div>
+  </div>
+
+<script>
+  // Token (por ahora fijo; después lo hacemos por link/QR)
+  const token = "servicio-juan-perez";
+
+  // Texto que ve la familia (podés cambiarlo)
+  document.getElementById("servicio").textContent = token.replaceAll("-", " ");
+
+  const map = L.map("map", { zoomControl: true }).setView([-34.6083, -58.3712], 14);
+
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "© OpenStreetMap"
+  }).addTo(map);
+
+  const marker = L.marker([-34.6083, -58.3712]).addTo(map);
+
+  function formatFecha(ts){
+    const d = new Date(ts * 1000); // tu backend usa segundos
+    return d.toLocaleString();
+  }
+
+  async function actualizar() {
+    const estado = document.getElementById("estado");
+    try{
+      estado.textContent = "Actualizando…";
+      const res = await fetch(`http://127.0.0.1:8000/last/${token}`);
+      if (!res.ok){
+        estado.textContent = "Esperando ubicación…";
+        return;
+      }
+      const data = await res.json();
+
+      marker.setLatLng([data.lat, data.lon]);
+      map.panTo([data.lat, data.lon]);
+
+      document.getElementById("ultima").textContent = formatFecha(data.ts);
+      estado.textContent = "En curso";
+    } catch (e){
+      estado.textContent = "Sin conexión";
+      console.log(e);
+    }
+  }
+
+  actualizar();
+  setInterval(actualizar, 5000);
+</script>
+</body>
+</html>
+

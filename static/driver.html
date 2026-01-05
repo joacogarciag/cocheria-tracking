@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cochería America | Envío de ubicación</title>
+  <style>
+    body{font-family:Arial,sans-serif;margin:0;background:#f4f5f7}
+    .wrap{max-width:720px;margin:0 auto;padding:14px}
+    .card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:14px}
+    h1{font-size:18px;margin:0 0 8px 0}
+    label{display:block;margin-top:10px;color:#374151;font-size:13px}
+    input{width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:10px;margin-top:6px}
+    button{padding:10px 12px;border-radius:10px;border:1px solid #e5e7eb;background:#111827;color:#fff;margin-top:12px;cursor:pointer}
+    button.secondary{background:#fff;color:#111827}
+    .row{display:flex;gap:10px;flex-wrap:wrap}
+    .row button{flex:1}
+    .status{margin-top:12px;font-size:13px;color:#374151}
+    code{background:#f3f4f6;padding:2px 6px;border-radius:6px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Envío de ubicación (Chofer)</h1>
+      <div style="font-size:13px;color:#6b7280">
+        Dejá esta pantalla abierta durante el traslado.
+      </div>
+
+      <label>Token del servicio</label>
+      <input id="token" value="servicio-juan-perez" />
+
+      <label>URL del backend</label>
+      <input id="baseUrl" value="" />
+
+
+      <div class="row">
+        <button id="start">Iniciar</button>
+        <button class="secondary" id="stop">Detener</button>
+      </div>
+
+      <div class="status" id="status">Estado: listo</div>
+    </div>
+  </div>
+
+<script>
+  let watchId = null;
+
+  async function postLocation(baseUrl, token, lat, lon){
+    const url = `/update/${encodeURIComponent(token)}`;
+    await fetch(url, {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({lat, lon})
+    });
+  }
+
+  function setStatus(msg){
+    document.getElementById("status").textContent = "Estado: " + msg;
+  }
+
+  document.getElementById("start").onclick = async () => {
+    const token = document.getElementById("token").value.trim();
+    const baseUrl = document.getElementById("baseUrl").value.trim();
+
+    if (!token) return setStatus("faltó token");
+
+    if (!navigator.geolocation){
+      return setStatus("este dispositivo no soporta GPS");
+    }
+
+    setStatus("pidiendo permiso de ubicación…");
+
+    // watchPosition actualiza cada vez que cambia la ubicación
+    watchId = navigator.geolocation.watchPosition(async (pos) => {
+      const lat = pos.coords.latitude;
+      const lon = pos.coords.longitude;
+
+      try{
+        await postLocation(baseUrl, token, lat, lon);
+        setStatus(`enviando… lat=${lat.toFixed(6)} lon=${lon.toFixed(6)}`);
+      } catch(e){
+        setStatus("error enviando (¿backend encendido?)");
+        console.log(e);
+      }
+    }, (err) => {
+      setStatus("no se pudo obtener ubicación: " + err.message);
+    }, {
+      enableHighAccuracy: true,
+      maximumAge: 2000,
+      timeout: 10000
+    });
+  };
+
+  document.getElementById("stop").onclick = () => {
+    if (watchId !== null){
+      navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+      setStatus("detenido");
+    }
+  };
+</script>
+</body>
+</html>
