@@ -7,48 +7,98 @@ Original file is located at
     https://colab.research.google.com/drive/147woLot8yAah0Z-6lqqwCtnn3wgc8yMW
 """
 
-from time import time
 from fastapi import FastAPI, HTTPException
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+import time
+import os
 
 app = FastAPI()
 
-# Servir archivos estáticos (logo y HTML si querés)
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# =========================
+# MODELOS
+# =========================
 
-def load_html(path: str) -> str:
-    with open(path, encoding="utf-8") as f:
-        return f.read()
-
-# ===== PÁGINAS PARA FAMILIA / CHOFER (con token en la URL) =====
-@app.get("/seguir/{token}", response_class=HTMLResponse)
-def seguir_token(token: str):
-    html = load_html("static/tracking.html")
-    return html.replace("%%TOKEN%%", token)
-
-@app.get("/driver/{token}", response_class=HTMLResponse)
-def driver_token(token: str):
-    html = load_html("static/driver.html")
-    return html.replace("%%TOKEN%%", token)
-
-# ===== API GPS =====
 class Location(BaseModel):
     lat: float
     lon: float
-    ts: float | None = None
 
-store = {}
+# =========================
+# STORAGE EN MEMORIA
+# =========================
+
+services = {}    # token -> { finished: bool, finished_ts: float | None }
+locations = {}   # token -> { lat, lon, ts }
+
+def ensure_service(token: str):
+    if token not in services:
+        services[token] = {
+            "finished": False,
+            "finished_ts": None
+        }
+
+# =========================
+# STATIC FILES
+# =========================
+os.makedirs("static", exist_ok=True)
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# =========================
+# ENDPOINTS API
+# =========================
 
 @app.post("/update/{token}")
 def update_location(token: str, loc: Location):
-    store[token] = {"lat": loc.lat, "lon": loc.lon, "ts": loc.ts or time()}
+    ensure_service(token)
+
+    if services[token]["finished"]:
+        return {"ok": False, "finished": True}
+
+    locations[token] = {
+        "lat": loc.lat,
+        "lon": loc.lon,
+        "ts": time.time()
+    }
     return {"ok": True}
 
 @app.get("/last/{token}")
 def last_location(token: str):
-    if token not in store:
-        raise HTTPException(status_code=404, detail="No data yet")
-    return store[token]
+    ensure_service(token)
+
+    if services[token]["finished"]:
+        raise HTTPException(status_code=410, detail="Servicio finalizado")
+
+    if token not in locations:
+        raise HTTPException(status_code=404, detail="Sin datos")
+
+    return locations[token]
+
+@app.post("/finish/{token}")
+def finish_service(token: str):
+    ensure_service(token)
+    services[token]["finished"] = True
+    services[token]["finished_ts"] = time.time()
+    return {"ok": True}
+
+# =========================
+# PÁGINAS HTML
+# =========================
+
+def render_html(filename: str, token: str):
+    path = os.path.join("static", filename)
+    with open(path, "r", encoding="utf-8") as f:
+        html = f.read()
+
+    html = html.replace("%%TOKEN%%", token)
+    html = html.replace("%%TITULO%%", token.replace("-", " "))
+    return html
+
+@app.get("/seguir/{token}", response_class=HTMLResponse)
+def seguir(token: str):
+    return render_html("tracking.html", token)
+
+@app.get("/driver/{token}", response_class=HTMLResponse)
+def driver(token: str):
+    return render_html("driver.html", token)
 
