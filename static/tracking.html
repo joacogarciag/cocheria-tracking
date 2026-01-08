@@ -23,8 +23,6 @@
     .chip{font-size:12px;color:var(--muted);}
     .status{font-size:12px;padding:6px 10px;border-radius:999px;background:#f3f4f6;border:1px solid var(--border);color:#374151;}
     #map{height:72vh;width:100%;}
-    .actions{padding:12px 14px;border-top:1px solid var(--border);display:flex;justify-content:center;}
-    .btn{background:#111827;color:#fff;border:0;border-radius:12px;padding:12px 16px;font-size:14px;font-weight:700;cursor:pointer;min-width:240px;}
     .leaflet-control-attribution{font-size:10px !important;}
   </style>
 </head>
@@ -49,10 +47,6 @@
       </div>
 
       <div id="map"></div>
-
-      <div class="actions">
-        <button id="finalizar" class="btn">Finalizar servicio</button>
-      </div>
     </div>
   </div>
 
@@ -94,19 +88,9 @@
     }
   }
 
-  document.getElementById("finalizar").onclick = async () => {
-    try{
-      const res = await fetch(`${backend}/finish/${encodeURIComponent(token)}`, {method:"POST"});
-      if(res.ok){
-        document.getElementById("estado").textContent = "Servicio finalizado";
-      }
-    }catch(e){}
-  };
-
   actualizar();
   setInterval(actualizar, 5000);
 </script>
 </body>
 </html>
-
 

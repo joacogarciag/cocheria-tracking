@@ -60,10 +60,7 @@
   </div>
 
 <script>
-  // SIEMPRE el backend es el mismo origen donde abriste /driver/...
-  // (esto evita 127.0.0.1 vs Render y evita placeholders)
   const backend = window.location.origin;
-
   let watchId = null;
 
   const statusEl = document.getElementById("status");
@@ -107,7 +104,6 @@
       }catch(e){
         statusEl.textContent = "Estado: error enviando";
         setPill("Sin conexión");
-        console.log(e);
       }
     }, (err) => {
       statusEl.textContent = "Estado: no se pudo obtener ubicación";
@@ -123,10 +119,8 @@
       return;
     }
 
-    // primero envío una vez
     await enviarUnaVez();
 
-    // después arranco seguimiento continuo
     if(watchId !== null) navigator.geolocation.clearWatch(watchId);
 
     statusEl.textContent = "Estado: en curso";
@@ -162,7 +156,6 @@
     const token = document.getElementById("token").value.trim();
     if(!token){ statusEl.textContent = "Estado: faltó token"; return; }
 
-    // paro envío
     if(watchId !== null){
       navigator.geolocation.clearWatch(watchId);
       watchId = null;
