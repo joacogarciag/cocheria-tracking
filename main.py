@@ -7,71 +7,47 @@ Original file is located at
     https://colab.research.google.com/drive/147woLot8yAah0Z-6lqqwCtnn3wgc8yMW
 """
 
-import sys
-!{sys.executable} -m pip install qrcode
-
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-import time
-import os
-
-import qrcode
 from io import BytesIO
-
+import os
+import time
 import qrcode
-from fastapi.responses import Response
-
 
 app = FastAPI()
 
-# Ensure the 'static' directory exists
-if not os.path.exists("static"):
-    os.makedirs("static")
-
-# Sirve /static (logo.png, driver.html, tracking.html, etc.)
+# Sirve /static/driver.html, /static/tracking.html, /static/logo.png, etc.
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Memoria en RAM (para MVP)
-# services[token] = {"lat":..., "lon":..., "ts":..., "finished": bool}
-services = {}
-
+# Memoria simple por token
+services = {}  # token -> {lat, lon, ts, finished}
 
 class UpdateBody(BaseModel):
     lat: float
     lon: float
 
+def _ensure_service(token: str):
+    if token not in services:
+        services[token] = {"lat": -34.6083, "lon": -58.3712, "ts": None, "finished": False}
 
-def _read_file(path: str) -> str:
+def _render_template(filename: str, **kwargs) -> str:
+    path = os.path.join("static", filename)
     with open(path, "r", encoding="utf-8") as f:
-        return f.read()
-
-
-def _render_template(filename: str, **vars) -> str:
-    html = _read_file(os.path.join("static", filename))
-    for k, v in vars.items():
+        html = f.read()
+    for k, v in kwargs.items():
         html = html.replace(f"%%{k}%%", str(v))
     return html
 
-
-def _ensure_service(token: str):
-    if token not in services:
-        services[token] = {"lat": None, "lon": None, "ts": None, "finished": False}
-
-
 @app.get("/", response_class=HTMLResponse)
 def home():
-    return HTMLResponse("<h3>OK</h3><p>Usá /driver/{token} o /seguir/{token}</p>")
-
+    return HTMLResponse("<h3>OK</h3><p>Usá /driver/{token} o /seguir/{token} o /qr/{token}.png</p>")
 
 @app.get("/driver/{token}", response_class=HTMLResponse)
 def driver_page(token: str):
     _ensure_service(token)
-    # Este backend es el mismo origen donde se abrió la página
-    # (en el HTML lo forzamos con window.location.origin, pero igual lo dejamos por si usás placeholders)
     return HTMLResponse(_render_template("driver.html", TOKEN=token))
-
 
 @app.get("/seguir/{token}", response_class=HTMLResponse)
 def tracking_page(token: str):
@@ -79,12 +55,10 @@ def tracking_page(token: str):
     titulo = token.replace("-", " ")
     return HTMLResponse(_render_template("tracking.html", TOKEN=token, TITULO=titulo))
 
-
 @app.post("/update/{token}")
 def update_location(token: str, body: UpdateBody):
     _ensure_service(token)
     if services[token]["finished"]:
-        # Si está finalizado, no aceptamos más updates
         raise HTTPException(status_code=410, detail="Servicio finalizado")
 
     services[token]["lat"] = body.lat
@@ -92,15 +66,12 @@ def update_location(token: str, body: UpdateBody):
     services[token]["ts"] = int(time.time())
     return {"ok": True}
 
-
 @app.get("/last/{token}")
 def last_location(token: str):
     if token not in services:
         raise HTTPException(status_code=404, detail="Servicio inexistente")
-
     if services[token]["finished"]:
         raise HTTPException(status_code=410, detail="Servicio finalizado")
-
     if services[token]["ts"] is None:
         raise HTTPException(status_code=404, detail="Sin ubicación todavía")
 
@@ -110,29 +81,21 @@ def last_location(token: str):
         "ts": services[token]["ts"],
     }
 
-
 @app.post("/finish/{token}")
 def finish_service(token: str):
     _ensure_service(token)
     services[token]["finished"] = True
     return {"ok": True}
 
-
 @app.get("/qr/{token}.png")
 def qr_png(token: str):
-    # QR apunta al link público de seguimiento (mismo dominio donde corre el backend)
-    # IMPORTANTE: esto funciona bien en Render, y en local te va a generar con 127.0.0.1
-    # Si querés “forzar” siempre Render, decímelo y lo fijo.
-    url = f"/seguir/{token}"
-    # El QR debe ser ABSOLUTO para que funcione desde cualquier lado:
-    # Lo construimos con base fija si estás en Render, sino con localhost.
-    # Mejor opción: usar variable de entorno PUBLIC_BASE_URL en Render.
-    public_base = os.getenv("PUBLIC_BASE_URL", "").strip().rstrip("/")
-    if public_base:
-        full = f"{public_base}{url}"
-    else:
-        # fallback local
-        full = f"http://127.0.0.1:8000{url}"
+    # QR apunta al seguimiento público en el mismo dominio
+    base = os.getenv("PUBLIC_BASE_URL", "").strip().rstrip("/")
+    if not base:
+        # fallback local si no está configurado
+        base = "http://127.0.0.1:8000"
+
+    full = f"{base}/seguir/{token}"
 
     qr = qrcode.QRCode(border=2, box_size=10)
     qr.add_data(full)
@@ -141,7 +104,5 @@ def qr_png(token: str):
 
     buf = BytesIO()
     img.save(buf, format="PNG")
-    png_bytes = buf.getvalue()
-
-    return Response(content=png_bytes, media_type="image/png")
+    return Response(content=buf.getvalue(), media_type="image/png")
 
