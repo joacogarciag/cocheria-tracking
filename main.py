@@ -8,97 +8,133 @@ Original file is located at
 """
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import time
 import os
 
+import qrcode
+from io import BytesIO
+
+import qrcode
+from fastapi.responses import Response
+
+
 app = FastAPI()
 
-# =========================
-# MODELOS
-# =========================
+# Sirve /static (logo.png, driver.html, tracking.html, etc.)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-class Location(BaseModel):
+# Memoria en RAM (para MVP)
+# services[token] = {"lat":..., "lon":..., "ts":..., "finished": bool}
+services = {}
+
+
+class UpdateBody(BaseModel):
     lat: float
     lon: float
 
-# =========================
-# STORAGE EN MEMORIA
-# =========================
 
-services = {}    # token -> { finished: bool, finished_ts: float | None }
-locations = {}   # token -> { lat, lon, ts }
+def _read_file(path: str) -> str:
+    with open(path, "r", encoding="utf-8") as f:
+        return f.read()
 
-def ensure_service(token: str):
+
+def _render_template(filename: str, **vars) -> str:
+    html = _read_file(os.path.join("static", filename))
+    for k, v in vars.items():
+        html = html.replace(f"%%{k}%%", str(v))
+    return html
+
+
+def _ensure_service(token: str):
     if token not in services:
-        services[token] = {
-            "finished": False,
-            "finished_ts": None
-        }
+        services[token] = {"lat": None, "lon": None, "ts": None, "finished": False}
 
-# =========================
-# STATIC FILES
-# =========================
-os.makedirs("static", exist_ok=True)
-app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# =========================
-# ENDPOINTS API
-# =========================
+@app.get("/", response_class=HTMLResponse)
+def home():
+    return HTMLResponse("<h3>OK</h3><p>Usá /driver/{token} o /seguir/{token}</p>")
+
+
+@app.get("/driver/{token}", response_class=HTMLResponse)
+def driver_page(token: str):
+    _ensure_service(token)
+    # Este backend es el mismo origen donde se abrió la página
+    # (en el HTML lo forzamos con window.location.origin, pero igual lo dejamos por si usás placeholders)
+    return HTMLResponse(_render_template("driver.html", TOKEN=token))
+
+
+@app.get("/seguir/{token}", response_class=HTMLResponse)
+def tracking_page(token: str):
+    _ensure_service(token)
+    titulo = token.replace("-", " ")
+    return HTMLResponse(_render_template("tracking.html", TOKEN=token, TITULO=titulo))
+
 
 @app.post("/update/{token}")
-def update_location(token: str, loc: Location):
-    ensure_service(token)
-
+def update_location(token: str, body: UpdateBody):
+    _ensure_service(token)
     if services[token]["finished"]:
-        return {"ok": False, "finished": True}
+        # Si está finalizado, no aceptamos más updates
+        raise HTTPException(status_code=410, detail="Servicio finalizado")
 
-    locations[token] = {
-        "lat": loc.lat,
-        "lon": loc.lon,
-        "ts": time.time()
-    }
+    services[token]["lat"] = body.lat
+    services[token]["lon"] = body.lon
+    services[token]["ts"] = int(time.time())
     return {"ok": True}
+
 
 @app.get("/last/{token}")
 def last_location(token: str):
-    ensure_service(token)
+    if token not in services:
+        raise HTTPException(status_code=404, detail="Servicio inexistente")
 
     if services[token]["finished"]:
         raise HTTPException(status_code=410, detail="Servicio finalizado")
 
-    if token not in locations:
-        raise HTTPException(status_code=404, detail="Sin datos")
+    if services[token]["ts"] is None:
+        raise HTTPException(status_code=404, detail="Sin ubicación todavía")
 
-    return locations[token]
+    return {
+        "lat": services[token]["lat"],
+        "lon": services[token]["lon"],
+        "ts": services[token]["ts"],
+    }
+
 
 @app.post("/finish/{token}")
 def finish_service(token: str):
-    ensure_service(token)
+    _ensure_service(token)
     services[token]["finished"] = True
-    services[token]["finished_ts"] = time.time()
     return {"ok": True}
 
-# =========================
-# PÁGINAS HTML
-# =========================
 
-def render_html(filename: str, token: str):
-    path = os.path.join("static", filename)
-    with open(path, "r", encoding="utf-8") as f:
-        html = f.read()
+@app.get("/qr/{token}.png")
+def qr_png(token: str):
+    # QR apunta al link público de seguimiento (mismo dominio donde corre el backend)
+    # IMPORTANTE: esto funciona bien en Render, y en local te va a generar con 127.0.0.1
+    # Si querés “forzar” siempre Render, decímelo y lo fijo.
+    url = f"/seguir/{token}"
+    # El QR debe ser ABSOLUTO para que funcione desde cualquier lado:
+    # Lo construimos con base fija si estás en Render, sino con localhost.
+    # Mejor opción: usar variable de entorno PUBLIC_BASE_URL en Render.
+    public_base = os.getenv("PUBLIC_BASE_URL", "").strip().rstrip("/")
+    if public_base:
+        full = f"{public_base}{url}"
+    else:
+        # fallback local
+        full = f"http://127.0.0.1:8000{url}"
 
-    html = html.replace("%%TOKEN%%", token)
-    html = html.replace("%%TITULO%%", token.replace("-", " "))
-    return html
+    qr = qrcode.QRCode(border=2, box_size=10)
+    qr.add_data(full)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
 
-@app.get("/seguir/{token}", response_class=HTMLResponse)
-def seguir(token: str):
-    return render_html("tracking.html", token)
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    png_bytes = buf.getvalue()
 
-@app.get("/driver/{token}", response_class=HTMLResponse)
-def driver(token: str):
-    return render_html("driver.html", token)
+    return Response(content=png_bytes, media_type="image/png")
 

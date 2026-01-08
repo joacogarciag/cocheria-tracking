@@ -3,102 +3,184 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Cochería America | Envío de ubicación</title>
+  <title>Chofer · Envío de ubicación</title>
   <style>
-    body{font-family:Arial,sans-serif;margin:0;background:#f4f5f7}
-    .wrap{max-width:720px;margin:0 auto;padding:14px}
-    .card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:14px}
-    h1{font-size:18px;margin:0 0 8px 0}
-    label{display:block;margin-top:10px;color:#374151;font-size:13px}
-    input{width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:10px;margin-top:6px}
-    button{padding:10px 12px;border-radius:10px;border:1px solid #e5e7eb;background:#111827;color:#fff;margin-top:12px;cursor:pointer}
-    button.secondary{background:#fff;color:#111827}
-    .row{display:flex;gap:10px;flex-wrap:wrap}
-    .row button{flex:1}
-    .status{margin-top:12px;font-size:13px;color:#374151}
-    code{background:#f3f4f6;padding:2px 6px;border-radius:6px}
+    :root{
+      --bg:#f4f5f7; --card:#fff; --text:#111827; --muted:#6b7280; --border:#e5e7eb;
+      --btn:#111827;
+    }
+    body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--text);}
+    .wrap{max-width:980px;margin:0 auto;padding:14px;}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;}
+    h1{margin:0 0 6px 0;font-size:22px;}
+    p{margin:0 0 12px 0;color:var(--muted);font-size:14px;}
+    label{display:block;font-size:12px;color:var(--muted);margin:10px 0 6px;}
+    input{
+      width:100%;box-sizing:border-box;padding:12px;border-radius:10px;border:1px solid var(--border);
+      font-size:14px;
+    }
+    .row{display:flex;gap:12px;flex-wrap:wrap;margin-top:12px;}
+    .btn{
+      flex:1;
+      background:var(--btn);
+      color:#fff;border:0;border-radius:12px;padding:12px 14px;font-size:14px;font-weight:700;
+      cursor:pointer;
+    }
+    .btn.secondary{background:#fff;color:#111827;border:1px solid var(--border);font-weight:700;}
+    .btn.danger{background:#fff;color:#b91c1c;border:1px solid #fecaca;}
+    .statusline{margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+    .pill{font-size:12px;padding:6px 10px;border-radius:999px;background:#f3f4f6;border:1px solid var(--border);color:#374151;}
+    #status{font-size:13px;color:#374151;}
+    .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="card">
       <h1>Envío de ubicación (Chofer)</h1>
-      <div style="font-size:13px;color:#6b7280">
-        Dejá esta pantalla abierta durante el traslado.
-      </div>
+      <p>Dejá esta pantalla abierta durante el traslado.</p>
 
       <label>Token del servicio</label>
-      <input id="token" value="servicio-juan-perez" />
-
-      <label>URL del backend</label>
-      <input id="baseUrl" value="" />
-
+      <input id="token" value="%%TOKEN%%" />
 
       <div class="row">
-        <button id="start">Iniciar</button>
-        <button class="secondary" id="stop">Detener</button>
+        <button class="btn" id="start">Iniciar envío</button>
+        <button class="btn secondary" id="stop">Detener envío</button>
       </div>
 
-      <div class="status" id="status">Estado: listo</div>
+      <div class="row">
+        <button class="btn danger" id="finish">Finalizar servicio</button>
+      </div>
+
+      <div class="statusline">
+        <span id="status">Estado: listo</span>
+        <span class="pill mono" id="pill">—</span>
+      </div>
     </div>
   </div>
 
 <script>
+  // SIEMPRE el backend es el mismo origen donde abriste /driver/...
+  // (esto evita 127.0.0.1 vs Render y evita placeholders)
+  const backend = window.location.origin;
+
   let watchId = null;
 
-  async function postLocation(baseUrl, token, lat, lon){
-    const url = `/update/${encodeURIComponent(token)}`;
-    await fetch(url, {
+  const statusEl = document.getElementById("status");
+  const pillEl = document.getElementById("pill");
+
+  function setPill(txt){ pillEl.textContent = txt; }
+
+  async function postJSON(url, payload){
+    return fetch(url, {
       method: "POST",
-      headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({lat, lon})
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(payload)
     });
   }
 
-  function setStatus(msg){
-    document.getElementById("status").textContent = "Estado: " + msg;
-  }
-
-  document.getElementById("start").onclick = async () => {
+  async function enviarUnaVez(){
     const token = document.getElementById("token").value.trim();
-    const baseUrl = document.getElementById("baseUrl").value.trim();
+    if(!token){ statusEl.textContent = "Estado: faltó token"; return; }
 
-    if (!token) return setStatus("faltó token");
-
-    if (!navigator.geolocation){
-      return setStatus("este dispositivo no soporta GPS");
+    if(!navigator.geolocation){
+      statusEl.textContent = "Estado: este dispositivo no soporta GPS";
+      return;
     }
 
-    setStatus("pidiendo permiso de ubicación…");
+    statusEl.textContent = "Estado: pidiendo permiso de ubicación…";
 
-    // watchPosition actualiza cada vez que cambia la ubicación
-    watchId = navigator.geolocation.watchPosition(async (pos) => {
+    navigator.geolocation.getCurrentPosition(async (pos) => {
       const lat = pos.coords.latitude;
       const lon = pos.coords.longitude;
 
       try{
-        await postLocation(baseUrl, token, lat, lon);
-        setStatus(`enviando… lat=${lat.toFixed(6)} lon=${lon.toFixed(6)}`);
-      } catch(e){
-        setStatus("error enviando (¿backend encendido?)");
+        statusEl.textContent = "Estado: enviando ubicación…";
+        const res = await postJSON(`${backend}/update/${encodeURIComponent(token)}`, {lat, lon});
+        if(!res.ok){
+          statusEl.textContent = `Estado: error enviando (${res.status})`;
+          setPill("Revisar backend");
+          return;
+        }
+        statusEl.textContent = "Estado: enviando (OK)";
+        setPill(`lat=${lat.toFixed(6)} lon=${lon.toFixed(6)}`);
+      }catch(e){
+        statusEl.textContent = "Estado: error enviando";
+        setPill("Sin conexión");
         console.log(e);
       }
     }, (err) => {
-      setStatus("no se pudo obtener ubicación: " + err.message);
-    }, {
-      enableHighAccuracy: true,
-      maximumAge: 2000,
-      timeout: 10000
-    });
+      statusEl.textContent = "Estado: no se pudo obtener ubicación";
+      setPill(err.message || "Error GPS");
+    }, { enableHighAccuracy:true, maximumAge:2000, timeout:10000 });
+  }
+
+  document.getElementById("start").onclick = async () => {
+    const token = document.getElementById("token").value.trim();
+    if(!token){ statusEl.textContent = "Estado: faltó token"; return; }
+    if(!navigator.geolocation){
+      statusEl.textContent = "Estado: este dispositivo no soporta GPS";
+      return;
+    }
+
+    // primero envío una vez
+    await enviarUnaVez();
+
+    // después arranco seguimiento continuo
+    if(watchId !== null) navigator.geolocation.clearWatch(watchId);
+
+    statusEl.textContent = "Estado: en curso";
+    watchId = navigator.geolocation.watchPosition(async (pos) => {
+      const lat = pos.coords.latitude;
+      const lon = pos.coords.longitude;
+      try{
+        const res = await postJSON(`${backend}/update/${encodeURIComponent(token)}`, {lat, lon});
+        if(!res.ok){
+          statusEl.textContent = `Estado: error enviando (${res.status})`;
+          return;
+        }
+        setPill(`lat=${lat.toFixed(6)} lon=${lon.toFixed(6)}`);
+      }catch(e){
+        statusEl.textContent = "Estado: sin conexión";
+      }
+    }, (err) => {
+      statusEl.textContent = "Estado: error GPS";
+      setPill(err.message || "Error GPS");
+    }, { enableHighAccuracy:true, maximumAge:2000, timeout:10000 });
   };
 
   document.getElementById("stop").onclick = () => {
-    if (watchId !== null){
+    if(watchId !== null){
       navigator.geolocation.clearWatch(watchId);
       watchId = null;
-      setStatus("detenido");
+    }
+    statusEl.textContent = "Estado: detenido";
+    setPill("—");
+  };
+
+  document.getElementById("finish").onclick = async () => {
+    const token = document.getElementById("token").value.trim();
+    if(!token){ statusEl.textContent = "Estado: faltó token"; return; }
+
+    // paro envío
+    if(watchId !== null){
+      navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+    }
+
+    try{
+      const res = await postJSON(`${backend}/finish/${encodeURIComponent(token)}`, {});
+      if(!res.ok){
+        statusEl.textContent = `Estado: no se pudo finalizar (${res.status})`;
+        return;
+      }
+      statusEl.textContent = "Estado: servicio finalizado";
+      setPill("OK");
+    }catch(e){
+      statusEl.textContent = "Estado: error finalizando";
     }
   };
 </script>
 </body>
 </html>
+

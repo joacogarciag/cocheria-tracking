@@ -3,129 +3,29 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cocheria America · Seguimiento</title>
 
-  <title>Cocheria America · Acompañamiento del servicio</title>
-
-  <!-- Leaflet -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <style>
-    :root{
-      --bg:#f4f5f7;
-      --card:#ffffff;
-      --text:#111827;
-      --muted:#6b7280;
-      --border:#e5e7eb;
-      --primary:#111827;
-      --danger:#991b1b;
-      --success:#065f46;
-    }
-    body{
-      margin:0;
-      font-family:Arial, sans-serif;
-      background:var(--bg);
-      color:var(--text);
-    }
-    .wrap{
-      max-width:980px;
-      margin:0 auto;
-      padding:14px;
-    }
-    .header{
-      background:var(--card);
-      border:1px solid var(--border);
-      border-radius:14px;
-      padding:12px 14px;
-      display:flex;
-      align-items:center;
-      gap:12px;
-    }
-    .logo{
-      width:54px;
-      height:54px;
-      border-radius:10px;
-      border:1px solid var(--border);
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      overflow:hidden;
-      flex:0 0 auto;
-    }
-    .logo img{
-      width:100%;
-      height:100%;
-      object-fit:contain;
-      padding:6px;
-    }
-    .title h1{
-      font-size:18px;
-      margin:0;
-      font-weight:700;
-    }
-    .title p{
-      margin:4px 0 0 0;
-      font-size:13px;
-      color:var(--muted);
-    }
-    .card{
-      margin-top:12px;
-      background:var(--card);
-      border:1px solid var(--border);
-      border-radius:14px;
-      overflow:hidden;
-    }
-    .info{
-      padding:12px 14px;
-      display:flex;
-      flex-wrap:wrap;
-      gap:10px 18px;
-      align-items:center;
-      border-bottom:1px solid var(--border);
-    }
-    .chip{
-      font-size:12px;
-      color:var(--muted);
-    }
-    .status{
-      font-size:12px;
-      padding:6px 10px;
-      border-radius:999px;
-      background:#f3f4f6;
-      border:1px solid var(--border);
-      color:#374151;
-    }
-    #map{
-      height:72vh;
-      width:100%;
-    }
-    .actions{
-      padding:12px;
-      text-align:center;
-      border-top:1px solid var(--border);
-    }
-    .btn{
-      padding:10px 16px;
-      border-radius:10px;
-      border:none;
-      font-size:14px;
-      cursor:pointer;
-    }
-    .btn-danger{
-      background:var(--danger);
-      color:white;
-    }
-    .btn-disabled{
-      background:#9ca3af;
-      color:white;
-      cursor:not-allowed;
-    }
-    .leaflet-control-attribution{
-      font-size:10px !important;
-    }
+    :root{--bg:#f4f5f7;--card:#fff;--text:#111827;--muted:#6b7280;--border:#e5e7eb;}
+    body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--text);}
+    .wrap{max-width:980px;margin:0 auto;padding:14px;}
+    .header{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:12px;}
+    .logo{width:54px;height:54px;border-radius:10px;background:#fff;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;overflow:hidden;flex:0 0 auto;}
+    .logo img{width:100%;height:100%;object-fit:contain;padding:6px;}
+    .title{line-height:1.2;}
+    .title h1{font-size:18px;margin:0;font-weight:700;letter-spacing:.2px;}
+    .title p{margin:4px 0 0 0;font-size:13px;color:var(--muted);}
+    .card{margin-top:12px;background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;}
+    .info{padding:12px 14px;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;border-bottom:1px solid var(--border);}
+    .chip{font-size:12px;color:var(--muted);}
+    .status{font-size:12px;padding:6px 10px;border-radius:999px;background:#f3f4f6;border:1px solid var(--border);color:#374151;}
+    #map{height:72vh;width:100%;}
+    .actions{padding:12px 14px;border-top:1px solid var(--border);display:flex;justify-content:center;}
+    .btn{background:#111827;color:#fff;border:0;border-radius:12px;padding:12px 16px;font-size:14px;font-weight:700;cursor:pointer;min-width:240px;}
+    .leaflet-control-attribution{font-size:10px !important;}
   </style>
 </head>
 
@@ -133,7 +33,7 @@
   <div class="wrap">
     <div class="header">
       <div class="logo">
-        <img src="/static/logo.png" alt="Cocheria America" onerror="this.style.display='none'">
+        <img src="/static/logo.png" alt="Cocheria America" onerror="this.style.display='none';">
       </div>
       <div class="title">
         <h1>Cocheria America · Acompañamiento del servicio</h1>
@@ -143,34 +43,27 @@
 
     <div class="card">
       <div class="info">
-        <div class="chip"><b>Servicio:</b> <span id="servicio"></span></div>
+        <div class="chip"><b>Servicio:</b> <span id="servicio">%%TITULO%%</span></div>
         <div class="chip"><b>Última actualización:</b> <span id="ultima">—</span></div>
-        <div class="status" id="estado">Esperando ubicación…</div>
+        <div class="status" id="estado">Actualizando…</div>
       </div>
 
       <div id="map"></div>
 
-          </div>
+      <div class="actions">
+        <button id="finalizar" class="btn">Finalizar servicio</button>
+      </div>
+    </div>
   </div>
 
 <script>
   const token = "%%TOKEN%%";
-  const BASE_URL = "https://cocheria-tracking.onrender.com";
+  const backend = window.location.origin;
 
-  document.getElementById("servicio").textContent =
-    token.replaceAll("-", " ");
-
-  const map = L.map("map").setView([-34.6083, -58.3712], 14);
-
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: "© OpenStreetMap"
-  }).addTo(map);
+  const map = L.map("map", { zoomControl:true }).setView([-34.6083, -58.3712], 14);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution:"© OpenStreetMap" }).addTo(map);
 
   const marker = L.marker([-34.6083, -58.3712]).addTo(map);
-
-  const estadoEl = document.getElementById("estado");
-  const ultimaEl = document.getElementById("ultima");
-  const btnFinalizar = document.getElementById("finalizar");
 
   function formatFecha(ts){
     const d = new Date(ts * 1000);
@@ -178,43 +71,42 @@
   }
 
   async function actualizar(){
+    const estado = document.getElementById("estado");
     try{
-      const res = await fetch(`${BASE_URL}/last/${token}`);
+      const res = await fetch(`${backend}/last/${encodeURIComponent(token)}`);
       if(!res.ok){
-        estadoEl.textContent = "Esperando ubicación…";
+        if(res.status === 410){
+          estado.textContent = "Servicio finalizado";
+          return;
+        }
+        estado.textContent = "Esperando ubicación…";
         return;
       }
-
       const data = await res.json();
+
       marker.setLatLng([data.lat, data.lon]);
       map.panTo([data.lat, data.lon]);
 
-      ultimaEl.textContent = formatFecha(data.ts);
-      estadoEl.textContent = "En curso";
+      document.getElementById("ultima").textContent = formatFecha(data.ts);
+      estado.textContent = "En curso";
     }catch(e){
-      estadoEl.textContent = "Sin conexión";
+      estado.textContent = "Sin conexión";
     }
   }
 
-  const timer = setInterval(actualizar, 5000);
-  actualizar();
-
-  btnFinalizar.onclick = async () => {
-    if(!confirm("¿Finalizar este servicio?")) return;
-
-    const res = await fetch(`${BASE_URL}/finish/${token}`, {
-      method: "POST"
-    });
-
-    if(res.ok){
-      clearInterval(timer);
-      estadoEl.textContent = "Servicio finalizado";
-      btnFinalizar.textContent = "Servicio finalizado";
-      btnFinalizar.classList.remove("btn-danger");
-      btnFinalizar.classList.add("btn-disabled");
-      btnFinalizar.disabled = true;
-    }
+  document.getElementById("finalizar").onclick = async () => {
+    try{
+      const res = await fetch(`${backend}/finish/${encodeURIComponent(token)}`, {method:"POST"});
+      if(res.ok){
+        document.getElementById("estado").textContent = "Servicio finalizado";
+      }
+    }catch(e){}
   };
+
+  actualizar();
+  setInterval(actualizar, 5000);
 </script>
 </body>
 </html>
+
+
