@@ -7,6 +7,9 @@ Original file is located at
     https://colab.research.google.com/drive/147woLot8yAah0Z-6lqqwCtnn3wgc8yMW
 """
 
+import sys
+!{sys.executable} -m pip install qrcode
+
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -22,6 +25,10 @@ from fastapi.responses import Response
 
 
 app = FastAPI()
+
+# Ensure the 'static' directory exists
+if not os.path.exists("static"):
+    os.makedirs("static")
 
 # Sirve /static (logo.png, driver.html, tracking.html, etc.)
 app.mount("/static", StaticFiles(directory="static"), name="static")
